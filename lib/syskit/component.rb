@@ -80,7 +80,8 @@ module Syskit
         # accessors created with {Models::Component#data_reader} and
         # {Models::Component#data_writer}
         def instanciate_data_accessors(accessors)
-            accessors.each_with_object({}) do |(name, object), h|
+            # Cannot use transform_values here, 'accessors' is not a hash
+            accessors.each_with_object({}) do |(name, object), h| # rubocop:disable Style/HashTransformValues
                 h[name] = object.instanciate(self)
             end
         end

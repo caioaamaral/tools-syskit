@@ -22,29 +22,29 @@ module Syskit
 
             # Updates the model according to a new hash
             def update_groups(groups)
-                @current_model.keys.each do |key|
-                    unless groups.key? key
-                        group_row = @items_name[key].index.row
-                        @items_name[key].clear
-                        @items_value[key].clear
-                        @items_name.delete key
-                        @items_value.delete key
-                        removeRow(group_row)
-                    end
+                @current_model.each_key do |key|
+                    next if groups.key? key
+
+                    group_row = @items_name[key].index.row
+                    @items_name[key].clear
+                    @items_value[key].clear
+                    @items_name.delete key
+                    @items_value.delete key
+                    removeRow(group_row)
                 end
 
                 @current_model = deep_copy(groups)
                 @editing_model = deep_copy(groups)
 
-                @current_model.keys.each do |key|
-                    unless @items_name.key? key
-                        @items_name[key], @items_value[key] = add_conf_item(key)
-                        @items_value[key].getter do
-                            @editing_model[key].enabled
-                        end
-                        @items_value[key].setter do |value|
-                            @editing_model[key].enabled = value
-                        end
+                @current_model.each_key do |key|
+                    next if @items_name.key? key
+
+                    @items_name[key], @items_value[key] = add_conf_item(key)
+                    @items_value[key].getter do
+                        @editing_model[key].enabled
+                    end
+                    @items_value[key].setter do |value|
+                        @editing_model[key].enabled = value
                     end
                 end
             end

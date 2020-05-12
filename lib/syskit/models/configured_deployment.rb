@@ -24,7 +24,7 @@ module Syskit
                 process_name = model.name, spawn_options = {}
             )
                 default_mappings =
-                    model
+                    model # rubocop:disable Style/HashTransformValues
                     .each_deployed_task_model
                     .each_with_object({}) do |(deployed_task_name, _), result|
                         result[deployed_task_name] = deployed_task_name
