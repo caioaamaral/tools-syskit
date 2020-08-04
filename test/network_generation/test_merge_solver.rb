@@ -23,7 +23,8 @@ describe Syskit::NetworkGeneration::MergeSolver do
             t0 = prepare_plan add: 1
             assert_equal t0, solver.replacement_for(t0)
         end
-        it "can resolve the same task twice and takes into accunt modifications in the replacement graph" do
+        it "can resolve the same task twice and takes into accunt modifications "\
+           "in the replacement graph" do
             t0, t1, t2 = prepare_plan add: 3
             solver.register_replacement(t0, t1)
             assert_equal t1, solver.replacement_for(t0)
@@ -84,7 +85,8 @@ describe Syskit::NetworkGeneration::MergeSolver do
             c1.depends_on(t1, role: "child")
             assert !solver.may_merge_compositions?(c0, c1)
         end
-        it "returns false for compositions that have the same children but the exported output ports differ" do
+        it "returns false for compositions that have the same children but the "\
+           "exported output ports differ" do
             srv_m = Syskit::DataService.new_submodel do
                 output_port "out", "/double"
             end
@@ -106,7 +108,8 @@ describe Syskit::NetworkGeneration::MergeSolver do
             assert !solver.may_merge_compositions?(cmp1, cmp2)
             assert !solver.may_merge_compositions?(cmp2, cmp1)
         end
-        it "returns false for compositions that have the same children but the exported input ports differ" do
+        it "returns false for compositions that have the same children but the "\
+           "exported input ports differ" do
             srv_m = Syskit::DataService.new_submodel do
                 input_port "in", "/double"
             end
@@ -128,7 +131,8 @@ describe Syskit::NetworkGeneration::MergeSolver do
             assert !solver.may_merge_compositions?(cmp1, cmp2)
             assert !solver.may_merge_compositions?(cmp2, cmp1)
         end
-        it "returns true for compositions that differ only on children whose role is not part of the model" do
+        it "returns true for compositions that differ only on children whose role "\
+           "is not part of the model" do
             plan.add(child = task_m.new)
             plan.add(task  = task_m.new)
             plan.add(c0 = cmp_m.new)
@@ -157,13 +161,13 @@ describe Syskit::NetworkGeneration::MergeSolver do
 
         it "should return an empty array if given the same task" do
             merged_task = mock_merged_task_with_concrete_input_connections(
-                [src = Object.new, "src_port", "sink_port", {}]
+                [Object.new, "src_port", "sink_port", {}]
             )
             assert_equal [], solver.resolve_input_matching(merged_task, merged_task)
         end
         it "should not check for multiplexing ports for ports that do match" do
             merged_task = mock_merged_task_with_concrete_input_connections(
-                [src = Object.new, "src_port", "sink_port", {}]
+                [Object.new, "src_port", "sink_port", {}]
             )
             task_model.should_receive(:find_input_port).never
             solver.resolve_input_matching(merged_task, merged_task)
@@ -191,7 +195,8 @@ describe Syskit::NetworkGeneration::MergeSolver do
                             .with(merged_task_policy, policy).and_return(nil).once
             refute solver.resolve_input_matching(merged_task, task)
         end
-        it "should call the task model with the input port name to get the port model if connections mismatch" do
+        it "should call the task model with the input port name to get the port "\
+           "model if connections mismatch" do
             task_model.should_receive(:find_input_port)
                       .with("sink_port").once.and_return(port_model)
             merged_task = mock_merged_task_with_concrete_input_connections(
@@ -217,7 +222,8 @@ describe Syskit::NetworkGeneration::MergeSolver do
             assert_equal [["sink_port", merged_task_src, src]],
                          solver.resolve_input_matching(merged_task, task)
         end
-        it "returns nil if the source port tasks are different and the policies are not compatible" do
+        it "returns nil if the source port tasks are different and the policies "\
+           "are not compatible" do
             merged_task = mock_merged_task_with_concrete_input_connections(
                 [flexmock, "src_port", "sink_port",
                  merged_task_policy = flexmock(empty?: false)]
@@ -234,12 +240,10 @@ describe Syskit::NetworkGeneration::MergeSolver do
            "the policies are compatible" do
             source_task = flexmock
             merged_task = mock_merged_task_with_concrete_input_connections(
-                [source_task, "src_port", "sink_port",
-                 merged_task_policy = flexmock(empty?: false)]
+                [source_task, "src_port", "sink_port", flexmock(empty?: false)]
             )
             task = mock_task_with_concrete_input_connections(
-                [source_task, "src_port", "sink_port",
-                 policy = flexmock(empty?: false)]
+                [source_task, "src_port", "sink_port", flexmock(empty?: false)]
             )
             flexmock(solver).should_receive(compatible_policies?: true)
             assert_equal([], solver.resolve_input_matching(merged_task, task))
@@ -338,13 +342,19 @@ describe Syskit::NetworkGeneration::MergeSolver do
                 cmp_m.add srv_m, as: "test"
                 cmp_m.export cmp_m.test_child.out_port
             end
-            it "does not merge two compositions of the same model using two different services of the same task" do
-                cmp1 = cmp_m.use(task_m.out1_srv).instanciate(plan)
-                cmp2 = cmp_m.use(task_m.out2_srv).instanciate(plan)
+            it "does not merge two compositions of the same model using two different "\
+               "services of the same task" do
+                cmp_m.use(task_m.out1_srv).instanciate(plan)
+                cmp_m.use(task_m.out2_srv).instanciate(plan)
                 solver = Syskit::NetworkGeneration::MergeSolver.new(plan)
+
+                mapping_validator = lambda do |mapping|
+                    mapping.to_a.all? do |a, b|
+                        a.kind_of?(Syskit::TaskContext) && b.kind_of?(Syskit::TaskContext)
+                    end
+                end
                 flexmock(solver).should_receive(:apply_merge_group)
-                                .with(->(mapping) { mapping.to_a.all? { |a, b| a.kind_of?(Syskit::TaskContext) && b.kind_of?(Syskit::TaskContext) } })
-                                .pass_thru
+                                .with(mapping_validator).pass_thru
                 solver.merge_identical_tasks
                 plan.clear
             end

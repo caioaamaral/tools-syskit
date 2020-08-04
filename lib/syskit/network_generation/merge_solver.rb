@@ -38,9 +38,11 @@ module Syskit
                 @plan = plan
                 @event_logger = event_logger
                 @dataflow_graph = plan.task_relation_graph_for(Flows::DataFlow)
-                @dependency_graph = plan.task_relation_graph_for(Roby::TaskStructure::Dependency)
+                @dependency_graph =
+                    plan.task_relation_graph_for(Roby::TaskStructure::Dependency)
                 @merging_candidates_queries = {}
-                @task_replacement_graph = Roby::Relations::BidirectionalDirectedAdjacencyGraph.new
+                @task_replacement_graph =
+                    Roby::Relations::BidirectionalDirectedAdjacencyGraph.new
                 @resolved_replacements = {}
                 @invalid_merges = Set.new
             end
@@ -58,11 +60,9 @@ module Syskit
             # @return [Roby::Task]
             # @see #register_replacement
             def replacement_for(task)
-                if replacement = @resolved_replacements[task]
+                if (replacement = @resolved_replacements[task])
                     # Verify that this is still a leaf in the replacement graph
-                    if task_replacement_graph.leaf?(replacement)
-                        return replacement
-                    end
+                    return replacement if task_replacement_graph.leaf?(replacement)
 
                     @resolved_replacements.delete(task)
                 end
@@ -82,7 +82,7 @@ module Syskit
             # @param [Roby::Task] new_task the task that replaced old_task
             # @return [void]
             def register_replacement(old_task, new_task)
-                if concrete_graph = dataflow_graph.concrete_connection_graph
+                if (concrete_graph = dataflow_graph.concrete_connection_graph)
                     concrete_graph.replace_vertex(old_task, new_task)
                 end
 
@@ -94,23 +94,23 @@ module Syskit
                 debug do
                     merged_task_to_task.each do |merged_task, task|
                         debug "merging"
-                        log_nest(2) do
-                            log_pp :debug, merged_task
-                        end
+                        log_nest(2) { log_pp :debug, merged_task }
                         debug "into"
-                        log_nest(2) do
-                            log_pp :debug, task
-                        end
+                        log_nest(2) { log_pp :debug, task }
                     end
                     break
                 end
 
                 if self.class.trace?
-                    remove_compositions = true
-                    if merged_task_to_task.each_key.any? { |t| t.kind_of?(Syskit::Composition) }
-                        remove_compositions = false
-                    end
-                    self.class.trace_export(plan, phase: 1, highlights: (merged_task_to_task.keys + merged_task_to_task.values), remove_compositions: remove_compositions)
+                    remove_compositions = merged_task_to_task
+                                          .each_key
+                                          .none? { |t| t.kind_of?(Syskit::Composition) }
+
+                    highlighted = merged_task_to_task.keys + merged_task_to_task.values
+                    self.class.trace_export(
+                        plan, phase: 1, highlights: highlighted,
+                              remove_compositions: remove_compositions
+                    )
                 end
 
                 merged_task_to_task.each do |merged_task, task|
@@ -118,9 +118,7 @@ module Syskit
                         raise "trying to merge a task onto itself: #{merged_task}"
                     end
 
-                    if task.respond_to?(:merge)
-                        task.merge(merged_task)
-                    end
+                    task.merge(merged_task) if task.respond_to?(:merge)
                 end
 
                 merged_event_to_event = {}
@@ -131,21 +129,22 @@ module Syskit
                     end
                 end
 
-                task_replacements = merged_task_to_task.transform_values do |task|
-                    [task]
-                end
+                task_replacements = merged_task_to_task
+                                    .transform_values { |task| [task] }
                 plan.replace_subplan(task_replacements, merged_event_to_event)
 
                 merged_task_to_task.each do |merged_task, task|
-                    unless merged_task.transaction_proxy?
-                        plan.remove_task(merged_task)
-                    end
+                    plan.remove_task(merged_task) unless merged_task.transaction_proxy?
                     register_replacement(merged_task, task)
                 end
 
-                if self.class.trace?
-                    self.class.trace_export(plan, phase: 2, highlights: merged_task_to_task.values, remove_compositions: remove_compositions)
-                end
+                return unless self.class.trace?
+
+                self.class.trace_export(
+                    plan,
+                    phase: 2, highlights: merged_task_to_task.values,
+                    remove_compositions: remove_compositions
+                )
             end
 
             def self.enable_tracing
@@ -174,9 +173,7 @@ module Syskit
             @@trace_last_phase = 1
 
             def self.trace_next_file(phase)
-                if @@trace_last_phase >= phase
-                    @@trace_count += 1
-                end
+                @@trace_count += 1 if @@trace_last_phase >= phase
                 @@trace_last_phase = phase
                 format(trace_file_pattern, @@trace_count, phase)
             end
@@ -185,8 +182,13 @@ module Syskit
                 basename = trace_next_file(phase)
                 dataflow = basename + ".dataflow.svg"
                 hierarchy = basename + ".hierarchy.svg"
-                Syskit::Graphviz.new(plan).to_file("dataflow", "svg", dataflow, highlights: highlights, **dataflow_options)
-                Syskit::Graphviz.new(plan).to_file("hierarchy", "svg", hierarchy, highlights: highlights)
+                Syskit::Graphviz.new(plan).to_file(
+                    "dataflow", "svg", dataflow,
+                    highlights: highlights, **dataflow_options
+                )
+                Syskit::Graphviz.new(plan).to_file(
+                    "hierarchy", "svg", hierarchy, highlights: highlights
+                )
                 ::Robot.info "#{self} exported trace plan to #{dataflow} and #{hierarchy}"
             end
 
@@ -235,7 +237,8 @@ module Syskit
                 candidates = plan.find_local_tasks(task.model.concrete_model)
                                  .to_a
                 debug do
-                    debug "#{candidates.to_a.size - 1} candidates for #{task}, matching model"
+                    debug "#{candidates.to_a.size - 1} candidates for #{task}, "\
+                          "matching model"
                     debug "  #{task.model.concrete_model}"
                     break
                 end
@@ -321,38 +324,37 @@ module Syskit
                 )
                     .map do |child_task|
                         dependency_graph.edge_info(task, child_task)[:roles].each do |r|
-                            if task_children_names.include?(r)
-                                result[r] = child_task
-                            end
+                            result[r] = child_task if task_children_names.include?(r)
                         end
                     end
                 result
             end
 
             def may_merge_compositions?(merged_task, task)
-                unless may_merge_task_contexts?(merged_task, task)
-                    return false
-                end
+                return false unless may_merge_task_contexts?(merged_task, task)
 
                 merged_task_children = composition_children_by_role(merged_task)
                 task_children        = composition_children_by_role(task)
-                merged_children = merged_task_children.merge(task_children) do |role, merged_task_child, task_child|
-                    if merged_task_child == task_child
-                        merged_task_child
-                    else
-                        info "rejected: compositions with different children or children in different roles"
-                        debug do
-                            debug "  in role #{role},"
-                            log_nest(2) do
-                                log_pp(:debug, merged_task_child)
+                merged_children =
+                    merged_task_children
+                    .merge(task_children) do |role, merged_task_child, task_child|
+                        if merged_task_child == task_child
+                            merged_task_child
+                        else
+                            info "rejected: compositions with different children "\
+                                 "or children in different roles"
+                            debug do
+                                debug "  in role #{role},"
+                                log_nest(2) do
+                                    log_pp(:debug, merged_task_child)
+                                end
+                                log_nest(2) do
+                                    log_pp(:debug, task_child)
+                                end
                             end
-                            log_nest(2) do
-                                log_pp(:debug, task_child)
-                            end
+                            return false
                         end
-                        return false
                     end
-                end
 
                 if merged_children.each_value.any?(&:placeholder?)
                     info "rejected: compositions still have unresolved children"
@@ -394,9 +396,7 @@ module Syskit
 
                 until queue.empty?
                     task = queue.shift
-                    if task.kind_of?(Syskit::Composition)
-                        topsort << task
-                    end
+                    topsort << task if task.kind_of?(Syskit::Composition)
                     dependency_graph.each_in_neighbour(task) do |parent|
                         d = (degrees[parent] -= 1)
                         queue << parent if d == 0
@@ -413,11 +413,10 @@ module Syskit
             end
 
             def resolve_merge(merged_task, task, mappings)
-                mismatched_inputs = log_nest(2) { resolve_input_matching(merged_task, task) }
-                unless mismatched_inputs
-                    # Incompatible inputs
-                    return false, mappings
-                end
+                mismatched_inputs =
+                    log_nest(2) { resolve_input_matching(merged_task, task) }
+                # Incompatible inputs
+                return false, mappings unless mismatched_inputs
 
                 mismatched_inputs.each do |sink_port, merged_source_task, source_task|
                     info do
@@ -467,14 +466,16 @@ module Syskit
             #   If nil, the two tasks have inputs that do not match and could
             #   not match even after a merge cycle resolution pass.
             #   Otherwise, the set of mismatching inputs is returned, in which
-            #   each mismatch is a tuple (port_name,source_port,task_source,target_source).
+            #   each mismatch is a tuple
+            #   (port_name,source_port,task_source,target_source).
             def resolve_input_matching(merged_task, task)
                 return [] if merged_task.equal?(task)
 
                 m_inputs = Hash.new { |h, k| h[k] = {} }
-                merged_task.each_concrete_input_connection do |m_source_task, m_source_port, sink_port, m_policy|
-                    m_inputs[sink_port][[m_source_task, m_source_port]] = m_policy
-                end
+                merged_task.each_concrete_input_connection \
+                    do |m_source_task, m_source_port, sink_port, m_policy|
+                        m_inputs[sink_port][[m_source_task, m_source_port]] = m_policy
+                    end
 
                 task.each_concrete_input_connection
                     .filter_map do |source_task, source_port, sink_port, policy|
