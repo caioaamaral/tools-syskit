@@ -13,6 +13,7 @@
     <depend package="tools/orocos.rb" />
     <depend package="tools/metaruby" />
     <depend package="tools/pocolog" />
+    <depend package="async-io" />
 
     <depend package="ruby2_keywords" />
 

@@ -24,7 +24,7 @@ module Syskit
             # If true, files that raise an error will be ignored. This is
             # usually used on "root" bundles (e.g. the Rock bundle) to have the
             # benefit of GUIs like browse even though some files have
-            # errors
+            # errore
             attr_predicate :ignore_load_errors, true
             # The set of process servers registered so far
             # @return [Hash<String,ProcessServerConfig>]
@@ -453,6 +453,11 @@ module Syskit
                 def disconnect; end
             end
 
+            # @deprecated use {#connect_to_process_server} instead
+            def connect_to_orocos_process_server(*args, **kw)
+                connect_to_process_server(*args, **kw)
+            end
+
             # Call to declare a new process server and add to the set of servers that
             # can be used by this plan manager
             #
@@ -466,7 +471,7 @@ module Syskit
             #   {#local_only?} is set
             # @raise [AlreadyConnected] if there is already a process server
             #   registered with that name
-            def connect_to_orocos_process_server(
+            def connect_to_process_server(
                 name, host, port: Orocos::RemoteProcesses::DEFAULT_PORT,
                 log_dir: nil, result_dir: nil, host_id: nil,
                 name_service: Orocos.name_service
