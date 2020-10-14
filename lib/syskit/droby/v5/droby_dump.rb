@@ -257,28 +257,26 @@ module Syskit
                                 )
                             end
 
-                            if @orogen_name
-                                begin
-                                    orogen_model = peer
-                                                   .orogen_task_context_model_from_name(@orogen_name)
-                                    local_model = Syskit::TaskContext
-                                                  .define_from_orogen(orogen_model, register: false)
-                                    if name
-                                        local_model.name = name
-                                    end
-                                rescue OroGen::TaskModelNotFound
-                                end
-                            end
+                            #if @orogen_name
+                            #    begin
+                            #        orogen_model = peer
+                            #                       .orogen_task_context_model_from_name(@orogen_name)
+                            #        local_model = Syskit::TaskContext
+                            #                      .define_from_orogen(orogen_model, register: false)
+                            #        if name
+                            #            local_model.name = name
+                            #        end
+                            #    rescue OroGen::TaskModelNotFound
+                            #    end
+                            #end
 
-                            unless orogen_model
-                                syskit_supermodel = peer.local_model(supermodel)
-                                local_model = syskit_supermodel
-                                              .new_submodel(name: @orogen_name)
-                                if name
-                                    local_model.name = name
-                                end
-                                peer.register_orogen_model(local_model, remote_siblings)
+                            syskit_supermodel = peer.local_model(supermodel)
+                            local_model = syskit_supermodel
+                                          .new_submodel(name: @orogen_name)
+                            if name
+                                local_model.name = name
                             end
+                            peer.register_orogen_model(local_model, remote_siblings)
 
                             local_model
                         end
