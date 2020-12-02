@@ -18,7 +18,6 @@ Lint/RedundantCopDisableDirective:
 Layout/LineLength:
   Exclude:
     - 'lib/syskit/actions/action_model.rb'
-    - 'lib/syskit/actions/profile.rb'
     - 'lib/syskit/composition.rb'
     - 'lib/syskit/connection_graph.rb'
     - 'lib/syskit/connection_graphs.rb'
@@ -229,7 +228,6 @@ Lint/AmbiguousRegexpLiteral:
 Lint/AssignmentInCondition:
   Exclude:
     - 'lib/syskit/actions/action_model.rb'
-    - 'lib/syskit/actions/profile.rb'
     - 'lib/syskit/coordination/data_monitor.rb'
     - 'lib/syskit/coordination/models/fault_response_table_extension.rb'
     - 'lib/syskit/coordination/models/port_handling.rb'
@@ -853,7 +851,6 @@ Style/Documentation:
     - 'spec/**/*'
     - 'test/**/*'
     - 'lib/syskit/abstract_component.rb'
-    - 'lib/syskit/actions/profile.rb'
     - 'lib/syskit/base.rb'
     - 'lib/syskit/cli/gen_main.rb'
     - 'lib/syskit/cli/main.rb'

@@ -206,7 +206,9 @@ module Syskit
                 required_host == other_task.required_host)
 
             if !result
-                NetworkGeneration.debug { "cannot merge #{other_task} in #{self}: different host constraints" }
+                NetworkGeneration.debug do
+                    "cannot merge #{other_task} in #{self}: different host constraints"
+                end
                 false
             else
                 true

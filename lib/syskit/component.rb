@@ -321,6 +321,7 @@ module Syskit
                 )
                 return
             end
+
             # We can not replace a non-abstract task with an
             # abstract one
             if !task.abstract? && abstract?

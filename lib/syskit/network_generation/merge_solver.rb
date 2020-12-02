@@ -197,15 +197,18 @@ module Syskit
                 solver.merge_identical_tasks
             end
 
-            # Tests whether task.merge(target_task) is a valid operation
+            # Tests whether task.merge(target_task) is a valid operation from
+            # the sole perspective of the tasks themselves
+            #
+            # This method takes care of the merge logic from the perspective of
+            # two tasks, ignoring their relationships with other tasks in the plan.
+            # (e.g. no dataflow checks)
             #
             # @param [Syskit::TaskContext] task
             # @param [Syskit::TaskContext] target_task
             #
-            # @return [false,true] if false, the merge is not possible. If
-            #   true, it is possible. If nil, the only thing that makes the
-            #   merge impossible are missing inputs, and these tasks might
-            #   therefore be merged if there was a dataflow cycle
+            # @return [Boolean] if false, the merge is not possible. If
+            #   true, it may be possible if the plan structure allows it
             def may_merge_task_contexts?(merged_task, task)
                 can_merge = log_nest(2) do
                     task.can_merge?(merged_task)

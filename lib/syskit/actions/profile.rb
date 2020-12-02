@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Syskit
-    module Actions
+    module Actions # :nodoc:
         # A representation of a set of dependency injections and definition of
         # pre-instanciated models
         class Profile
@@ -55,13 +55,16 @@ module Syskit
                 end
             end
 
+            # Instance requirement object that is a named definition
             class Definition < ProfileInstanceRequirements
                 def to_action_model(profile = self.profile, doc = self.doc)
                     resolve.to_action_model(profile, doc || "defined in #{profile}")
                 end
 
                 def resolve
-                    result = ProfileInstanceRequirements.new(profile, name, advanced: advanced?)
+                    result = ProfileInstanceRequirements.new(
+                        profile, name, advanced: advanced?
+                    )
                     result.merge(self)
                     result.name = name
                     profile.inject_di_context(result)
@@ -411,11 +414,12 @@ module Syskit
             # @raise [ArgumentError] if the definition does not exist
             # @see resolved_definition
             def definition(name)
-                if req = find_definition_by_name(name)
-                    req
-                else
-                    raise ArgumentError, "profile #{self.name} has no definition called #{name}"
+                unless (req = find_definition_by_name(name))
+                    raise ArgumentError,
+                          "profile #{self.name} has no definition called #{name}"
                 end
+
+                req
             end
 
             # Returns the instance requirement object that represents the given
@@ -426,9 +430,7 @@ module Syskit
             #   name, or nil if there is none
             # @see definition resolved_definition
             def find_definition_by_name(name)
-                if req = definitions[name]
-                    req.dup
-                end
+                definitions[name]&.dup
             end
 
             # Returns the instance requirement object that represents the given
@@ -441,12 +443,7 @@ module Syskit
             # @raise [ArgumentError] if the definition does not exist
             # @see definition
             def resolved_definition(name)
-                req = definitions[name]
-                unless req
-                    raise ArgumentError,
-                          "profile #{self.name} has no definition called #{name}"
-                end
-                req.resolve
+                definition(name).resolve
             end
 
             # Enumerate all definitions on this profile and resolve them
@@ -488,12 +485,16 @@ module Syskit
 
             # (see Models::DeploymentGroup#use_deployment)
             def use_deployment(*names, on: "localhost", loader: nil, **run_options)
-                deployment_group.use_deployment(*names, on: on, loader: loader, **run_options)
+                deployment_group.use_deployment(
+                    *names, on: on, loader: loader, **run_options
+                )
             end
 
             # (see Models::DeploymentGroup#use_deployments_from)
             def use_deployments_from(project_name, loader: nil, **use_options)
-                deployment_group.use_deployments_from(project_name, loader: loader, **use_options)
+                deployment_group.use_deployments_from(
+                    project_name, loader: loader, **use_options
+                )
             end
 
             # Create a deployment group to specify definition deployments
@@ -714,6 +715,7 @@ module Syskit
             include Roby::DRoby::V5::DRobyConstant::Dump
         end
 
+        # Implementation of the profile-related DSL in Module
         module ProfileDefinitionDSL
             # Declares a new syskit profile, and registers it as a constant on
             # this module
