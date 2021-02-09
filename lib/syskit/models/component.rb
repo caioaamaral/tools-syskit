@@ -1311,8 +1311,8 @@ module Syskit
             #    data_reader some_child.out_port, as: 'pose'
             #
             # @return [DynamicPortBinding::BoundOutputReader]
-            def data_reader(port, as:)
-                port = DynamicPortBinding.create(port)
+            def data_reader(port, as:, all: false)
+                port = DynamicPortBinding.create(port, all: all)
                 unless port.output?
                     raise ArgumentError,
                           "expected an output port, but #{port} seems to be an input"
@@ -1344,8 +1344,8 @@ module Syskit
             #    data_reader some_child.cmd_in_port, as: 'cmd_in'
             #
             # @return [DynamicPortBinding::BoundInputWriter]
-            def data_writer(port, as:)
-                port = DynamicPortBinding.create(port)
+            def data_writer(port, as:, all: false)
+                port = DynamicPortBinding.create(port, all: all)
                 if port.output?
                     raise ArgumentError,
                           "expected an input port, but #{port} seems to be an output"

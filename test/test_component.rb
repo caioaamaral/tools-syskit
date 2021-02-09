@@ -663,6 +663,44 @@ describe Syskit::Component do
             expect_execution.to { achieve { reader.connected? } }
             assert_equal task.out_port, reader.resolved_accessor.port
         end
+
+        describe "all: true" do
+            before do
+                @support_task_m.data_reader(
+                    @task_m.match.running.out_port, as: "test", all: true
+                )
+                @support_task = syskit_stub_deploy_configure_and_start(@support_task_m)
+                @task1 = syskit_stub_deploy_configure_and_start(@task_m)
+                @task2 = syskit_stub_deploy_configure_and_start(@task_m)
+
+                @reader = reader = @support_task.test_reader
+                expect_execution.to { achieve { reader.connected? } }
+            end
+
+            it "constructs a composite reader if 'all' is set" do
+                assert_equal(
+                    Set[@task1.out_port, @task2.out_port],
+                    @reader.resolved_accessor.port.ports.to_set
+                )
+            end
+
+            it "reads from the composite reader" do
+                execute do
+                    syskit_write @task1.out_port, 10
+                    syskit_write @task2.out_port, 20
+                end
+                assert_equal Set[10, 20], @reader.read_new
+            end
+
+            it "returns from read_new even if there is only one port updated" do
+                syskit_write @task1.out_port, 10
+                assert_equal Set[10, nil], @reader.read_new
+            end
+
+            it "does return nil in read_new if none of the ports are updated" do
+                assert_equal nil, @reader.read_new
+            end
+        end
     end
 
     describe Syskit::Component::DataAccessorInterface do
@@ -931,6 +969,20 @@ describe Syskit::Component do
             task = syskit_stub_deploy_configure_and_start(@task_m)
             expect_execution.to { achieve { writer.connected? } }
             assert_equal task.in_port, writer.resolved_accessor.port
+        end
+
+        it "handles a writer with #all set" do
+            @support_task_m.data_writer @task_m.match.running.in_port,
+                                        as: "test", all: true
+            support_task = syskit_stub_deploy_configure_and_start(@support_task_m)
+            task = syskit_stub_deploy_configure_and_start(@task_m)
+
+            writer = support_task.test_writer
+            expect_execution.to { achieve { writer.connected? } }
+            assert_equal(
+                Syskit::DynamicPortBinding::CompositePort.new([task.in_port]),
+                writer.resolved_accessor.port
+            )
         end
     end
 

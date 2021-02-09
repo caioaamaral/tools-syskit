@@ -61,7 +61,7 @@ module Syskit
         # this binding's direction
         def to_data_accessor(**policy)
             if output?
-                OutputReader.new(self, **policy)
+                OutputReader.new(self, all: @model.all?, **policy)
             else
                 InputWriter.new(self, **policy)
             end
@@ -71,7 +71,7 @@ module Syskit
         # this binding's direction
         def to_bound_data_accessor(name, component, **policy)
             if output?
-                BoundOutputReader.new(name, component, self, **policy)
+                BoundOutputReader.new(name, component, self, all: @model.all?, **policy)
             else
                 BoundInputWriter.new(name, component, self, **policy)
             end
@@ -188,9 +188,10 @@ module Syskit
             def initialize(
                 port_binding,
                 value_resolver: Models::DynamicPortBinding::IdentityValueResolver.new,
-                **policy
+                all: false, **policy
             )
                 super(port_binding, **policy)
+                @all = all
                 @value_resolver = value_resolver
             end
 
@@ -211,7 +212,7 @@ module Syskit
             def read(sample = nil)
                 return unless (sample = @resolved_accessor&.read(sample))
 
-                @value_resolver.__resolve(sample)
+                @value_resolver.__resolve(sample, @resolved_accessor.port, all: @all)
             end
 
             # Read new data
@@ -223,7 +224,7 @@ module Syskit
             def read_new(sample = nil)
                 return unless (sample = @resolved_accessor&.read_new(sample))
 
-                @value_resolver.__resolve(sample)
+                @value_resolver.__resolve(sample, @resolved_accessor.port, all: @all)
             end
         end
 
@@ -286,21 +287,116 @@ module Syskit
 
         # @api private
         #
+        # Facade that provides a port-like API over an array of actual ports
+        class CompositePort
+            # The underlying ports
+            attr_reader :ports
+
+            def initialize(ports)
+                @ports = ports.to_ary
+            end
+
+            def to_actual_port
+                self.class.new(@ports.map(&:to_actual_port))
+            end
+
+            def writer(*args, **keywords)
+                writers = @ports.map { |p| p.writer(*args, **keywords) }
+                CompositeInputWriter.new(self, writers)
+            end
+
+            def reader(*args, **keywords)
+                readers = @ports.map { |p| p.reader(*args, **keywords) }
+                CompositeOutputReader.new(self, readers)
+            end
+
+            def ==(other)
+                other.kind_of?(CompositePort) &&
+                    other.ports == @ports
+            end
+        end
+
+        # @api private
+        #
+        # Facade that provides a data accessor-like API over an array of actual
+        # data accessors
+        class CompositeAccessor
+            attr_reader :port
+
+            def initialize(port, accessors)
+                @port = port
+                @accessors = accessors
+            end
+
+            def new_sample
+                @accessors.map(&:new_sample)
+            end
+
+            def connected?
+                @accessors.all?(&:connected?)
+            end
+
+            def disconnect
+                @accessors.each(&:disconnect)
+            end
+        end
+
+        # @api private
+        #
+        # Facade that provides a data reader-like API over an array of actual
+        # data readers
+        class CompositeOutputReader < CompositeAccessor
+            def read_new
+                has_value = false
+                new_values = @accessors.map do |p|
+                    v = p.read_new
+                    has_value = v || has_value
+                end
+                new_values if has_value
+            end
+
+            def read
+                @accessors.map(&:read)
+            end
+        end
+
+        # @api private
+        #
+        # Facade that provides a data writer-like API over an array of actual
+        # data writers
+        class CompositeInputWriter < CompositeAccessor
+            def write(sample)
+                @accessors.map { |w| w.write(sample) }
+            end
+        end
+
+        # @api private
+        #
         # Resolver object to find a port within a plan using a {Queries::PortMatcher}
         class MatcherPortResolver
-            def initialize(plan, matcher)
+            def initialize(plan, matcher, all: false)
                 @plan = plan
                 @matcher = matcher
                 @last_provider_task = nil
+                @all = all
             end
 
             def update
-                port = @matcher.each_in_plan(@plan).first
-                port&.to_actual_port
+                matches = @matcher.each_in_plan(@plan)
+                return if matches.empty?
+
+                selected_port =
+                    if @all
+                        CompositePort.new(matches.to_a)
+                    else
+                        matches.first
+                    end
+
+                selected_port.to_actual_port
             end
 
-            def self.instanciate(task, model)
-                new(task.plan, model.port_model)
+            def self.instanciate(task, model, all: false)
+                new(task.plan, model.port_model, all: all)
             end
         end
 
@@ -316,7 +412,7 @@ module Syskit
                 @port if @port.component.plan
             end
 
-            def self.instanciate(task, model)
+            def self.instanciate(task, model, **)
                 new(model.port_model.bind(task))
             end
         end
@@ -334,7 +430,7 @@ module Syskit
                 @port if @port.component.to_task.plan
             end
 
-            def self.instanciate(task, model)
+            def self.instanciate(task, model, **)
                 child = model.port_model.component_model
                              .resolve_and_bind_child_recursive(task)
                 new(model.port_model.bind(child))

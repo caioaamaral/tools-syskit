@@ -16,7 +16,7 @@ module Syskit
                 it "creates from matcher in .create" do
                     flexmock(DynamicPortBinding)
                         .should_receive(:create_from_matcher)
-                        .with(@matcher).once.and_return(ret = flexmock)
+                        .with(@matcher, { all: false }).once.and_return(ret = flexmock)
                     assert_equal ret,
                                  Models::DynamicPortBinding.create(@matcher)
                 end
@@ -169,14 +169,16 @@ module Syskit
                 it "is used for a plain component port" do
                     flexmock(DynamicPortBinding)
                         .should_receive(:create_from_component_port)
-                        .with(@task_m.out_port).once.and_return(ret = flexmock)
+                        .with(@task_m.out_port, { all: false })
+                        .once.and_return(ret = flexmock)
                     assert_equal ret, Models::DynamicPortBinding.create(@task_m.out_port)
                 end
 
                 it "is used for a component child port" do
                     flexmock(DynamicPortBinding)
                         .should_receive(:create_from_component_port)
-                        .with(@cmp.test_child.out_port).once.and_return(ret = flexmock)
+                        .with(@cmp.test_child.out_port, { all: false })
+                        .once.and_return(ret = flexmock)
                     assert_equal(
                         ret, Models::DynamicPortBinding.create(@cmp.test_child.out_port)
                     )
@@ -245,11 +247,11 @@ module Syskit
 
                     it "creates a resolver for a field of a compound" do
                         s = @type.new(field: 20)
-                        assert_equal 20, @resolver.field.__resolve(s)
+                        assert_equal 20, @resolver.field.__resolve(s, nil)
                     end
 
                     it "raises NoMethodError if trying to access a field that does not "\
-                    "exist" do
+                       "exist" do
                         e = assert_raises(NoMethodError) do
                             @resolver.does_not_exist
                         end
@@ -295,7 +297,7 @@ module Syskit
                     it "creates a resolver for an element" do
                         v = @type.new
                         v.field[5] = 42
-                        assert_equal 42, @resolver.field[5].__resolve(v)
+                        assert_equal 42, @resolver.field[5].__resolve(v, nil)
                     end
 
                     it "validates the index when accessing an array" do
@@ -346,7 +348,7 @@ module Syskit
                     it "creates a resolver for an element" do
                         v = @type.new
                         v << 1 << 42 << 5
-                        assert_equal 42, @resolver[1].__resolve(v)
+                        assert_equal 42, @resolver[1].__resolve(v, nil)
                     end
 
                     it "raises if attempting to access another method than []" do
@@ -394,7 +396,7 @@ module Syskit
                     a = a_t.new
                     a.field[5] = 42
                     b = b_t.new(field: [a_t.new, a])
-                    assert_equal 42, r.field[1].field[5].__resolve(b)
+                    assert_equal 42, r.field[1].field[5].__resolve(b, nil)
                 end
 
                 describe "transform" do
@@ -407,21 +409,21 @@ module Syskit
 
                     it "accepts an arbitrary transformation in the form of a block" do
                         v = @type.new(field: 20)
-                        assert_equal 20, @resolver.transform(&:field).__resolve(v)
+                        assert_equal 20, @resolver.transform(&:field).__resolve(v, nil)
                     end
 
                     it "accepts an arbitrary transformation in sub-fields" do
                         resolver = @resolver.field.transform { |v| v * 2 }
                         v = @type.new(field: 20)
-                        assert_equal 40, resolver.__resolve(v)
+                        assert_equal 40, resolver.__resolve(v, nil)
                     end
 
                     it "returns a new resolver" do
                         parent = @resolver.field
                         transformed = parent.transform { |v| v * 2 }
                         v = @type.new(field: 20)
-                        assert_equal 20, parent.__resolve(v)
-                        assert_equal 40, transformed.__resolve(v)
+                        assert_equal 20, parent.__resolve(v, nil)
+                        assert_equal 40, transformed.__resolve(v, nil)
                     end
 
                     it "raises if trying to add two transformations" do
@@ -451,7 +453,7 @@ module Syskit
                     r = make_resolver(struct_m)
 
                     s = struct_m.new(field: 20)
-                    assert_equal s, r.__resolve(s)
+                    assert_equal s, r.__resolve(s, nil)
                 end
             end
 

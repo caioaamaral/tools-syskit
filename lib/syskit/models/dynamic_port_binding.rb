@@ -12,11 +12,22 @@ module Syskit
             # This resolver's data type
             attr_reader :type
 
-            def initialize(port_model, type, output: port_model.output?, port_resolver:)
+            # @param [Boolean] all if false (the default), matchers that can resolve
+            #   to more than one port will return only the first one. If true, they
+            #   will track all the matches
+            def initialize(
+                port_model, type, output: port_model.output?, port_resolver:, all: false
+            )
                 @port_model = port_model
                 @type = type
                 @output = output
                 @port_resolver = port_resolver
+                @all = all
+            end
+
+            # Whether the binding should resolve all matching ports or only the first one
+            def all?
+                @all
             end
 
             # Whether this binds to an output port or to an input port
@@ -52,18 +63,18 @@ module Syskit
             # A {Port} will return a binding based on a component port
             # ({#create_from_component_port}), a {Queries::PortMatcher}
             # will return a binding based on a query.
-            def self.create(port)
+            def self.create(port, all: false)
                 # Only PortMatcher responds to :match. Plain ports do not
                 if port.respond_to?(:match)
-                    create_from_matcher(port)
+                    create_from_matcher(port, all: all)
                 else
-                    create_from_component_port(port)
+                    create_from_component_port(port, all: all)
                 end
             end
 
             # Create a {DynamicPortBinding} model from a component or
             # composition child port model
-            def self.create_from_component_port(port)
+            def self.create_from_component_port(port, all: false)
                 resolver =
                     if port.component_model.kind_of?(Models::CompositionChild)
                         Syskit::DynamicPortBinding::CompositionChildPortResolver
@@ -71,7 +82,8 @@ module Syskit
                         Syskit::DynamicPortBinding::ComponentPortResolver
                     end
 
-                new(port, port.type, output: port.output?, port_resolver: resolver)
+                new(port, port.type,
+                    all: all, output: port.output?, port_resolver: resolver)
             end
 
             # Create a {DynamicPortBinding} model from a {Queries::PortMatcher}
@@ -80,7 +92,7 @@ module Syskit
             #   method will try to auto-detect the direction from the matcher
             #   and raise if it cannot be resolved (usually because the given
             #   port matcher resolves the port(s) by type and not by name)
-            def self.create_from_matcher(matcher, direction: :auto)
+            def self.create_from_matcher(matcher, direction: :auto, all: false)
                 matcher = matcher.match
 
                 unless %i[auto input output].include?(direction)
@@ -105,6 +117,7 @@ module Syskit
 
                 new(matcher, type,
                     output: direction == :output,
+                    all: all,
                     port_resolver: Syskit::DynamicPortBinding::MatcherPortResolver)
             end
 
@@ -119,7 +132,7 @@ module Syskit
             # This instanciation must be delayed until the task is within its
             # execution plan (e.g. task startup)
             def instanciate_port_resolver(task)
-                @port_resolver.instanciate(task, self)
+                @port_resolver.instanciate(task, self, all: @all)
             end
 
             # Model of a data reader bound to a {DynamicPortBinding}
@@ -156,7 +169,7 @@ module Syskit
                 end
 
                 # Defined to match the {ValueResolver} interface
-                def __resolve(value)
+                def __resolve(value, _port, **)
                     value
                 end
 
@@ -246,7 +259,7 @@ module Syskit
             #
             # Identity version of {ValueResolver}
             class IdentityValueResolver
-                def __resolve(value)
+                def __resolve(value, _port, **)
                     value
                 end
             end
@@ -269,16 +282,30 @@ module Syskit
                     @reader
                 end
 
-                def __resolve(value)
-                    resolved_path = @path.inject(value) do |v, (m, args, _)|
+                def __resolve(value, port, all: false)
+                    resolved_value =
+                        if all
+                            __resolve_all(value)
+                        else
+                            __resolve_single(value)
+                        end
+
+                    if @transform
+                        @transform.call(resolved_value, port)
+                    else
+                        resolved_value
+                    end
+                end
+
+                def __resolve_all(value)
+                    value.map { |root_value| resolve_single(root_value) }
+                end
+
+                def __resolve_single(value)
+                    resolved_value = @path.inject(value) do |v, (m, args, _)|
                         v.send(m, *args)
                     end
-                    resolved_path = ::Typelib.to_ruby(resolved_path)
-                    if @transform
-                        @transform.call(resolved_path)
-                    else
-                        resolved_path
-                    end
+                    ::Typelib.to_ruby(resolved_value)
                 end
 
                 def respond_to_missing?(name)
@@ -375,13 +402,27 @@ module Syskit
                     )
                 end
 
-                def transform(&block)
+                def transform(with_task: false, &block)
                     if @transform
                         ::Kernel.raise ::ArgumentError,
                                        "this resolver already has a transform block"
                     end
+
+                    transform_block =
+                        if with_task
+                            lambda do |value, port|
+                                if port.respond_to?(:ports)
+                                    block.call Hash[port.ports.zip(value)]
+                                else
+                                    block.call port => value
+                                end
+                            end
+                        else
+                            ->(value, _) { block.call(value) }
+                        end
+
                     ValueResolver.new(
-                        @reader, path: @path, type: @type, transform: block
+                        @reader, path: @path, type: @type, transform: transform_block
                     )
                 end
 

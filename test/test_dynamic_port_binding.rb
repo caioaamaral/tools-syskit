@@ -222,44 +222,92 @@ module Syskit
         describe "#update from a port matcher" do
             attr_reader :task, :port_binding
 
-            before do
-                @port_binding_m =
-                    Models::DynamicPortBinding
-                    .create_from_matcher(@task_m.match.running.out_port)
-                @task = syskit_stub_and_deploy(@task_m, remote_task: false)
-                @port_binding = @port_binding_m.instanciate.attach_to_task(@task)
+            describe "all: false" do
+                before do
+                    @port_binding_m =
+                        Models::DynamicPortBinding
+                        .create_from_matcher(@task_m.match.running.out_port)
+                    @task = syskit_stub_and_deploy(@task_m, remote_task: false)
+                    @port_binding = @port_binding_m.instanciate.attach_to_task(@task)
+                end
+
+                it "returns [false, nil] in #update if the binding is not attached" do
+                    port_binding = @port_binding_m.instanciate
+                    assert_equal [false, nil], port_binding.update
+                end
+
+                it "returns [false, nil] if there are no matches in the plan" do
+                    assert_equal [false, nil], @port_binding.update
+                end
+
+                it "returns [true, port] if there is a new match in the plan" do
+                    syskit_configure_and_start(@task)
+
+                    assert_equal [true, @task.out_port], @port_binding.update
+                    assert @port_binding.valid?
+                end
+
+                it "returns [false, port] if the current match is still valid" do
+                    syskit_configure_and_start(@task)
+                    @port_binding.update
+                    assert_equal [false, @task.out_port], @port_binding.update
+                    assert @port_binding.valid?
+                end
+
+                it "returns [true, nil] if the current match is not valid anymore" do
+                    syskit_configure_and_start(@task)
+                    @port_binding.update
+                    syskit_stop task
+
+                    assert_equal [true, nil], @port_binding.update
+                    refute @port_binding.valid?
+                end
             end
 
-            it "returns [false, nil] in #update if the binding is not attached" do
-                port_binding = @port_binding_m.instanciate
-                assert_equal [false, nil], port_binding.update
-            end
+            describe "all: true" do
+                before do
+                    @port_binding_m =
+                        Models::DynamicPortBinding
+                        .create_from_matcher(@task_m.match.running.out_port, all: true)
+                    @task = syskit_stub_and_deploy(@task_m, remote_task: false)
+                    @port_binding = @port_binding_m.instanciate.attach_to_task(@task)
+                end
 
-            it "returns [false, nil] if there are no matches in the plan" do
-                assert_equal [false, nil], @port_binding.update
-            end
+                it "returns [false, nil] in #update if the binding is not attached" do
+                    port_binding = @port_binding_m.instanciate
+                    assert_equal [false, nil], port_binding.update
+                end
 
-            it "returns [true, port] if there is a new match in the plan" do
-                syskit_configure_and_start(@task)
+                it "returns [false, nil] if there are no matches in the plan" do
+                    assert_equal [false, nil], @port_binding.update
+                end
 
-                assert_equal [true, @task.out_port], @port_binding.update
-                assert @port_binding.valid?
-            end
+                it "returns [true, port] if there is a new match in the plan" do
+                    syskit_configure_and_start(@task)
 
-            it "returns [false, port] if the current match is still valid" do
-                syskit_configure_and_start(@task)
-                @port_binding.update
-                assert_equal [false, @task.out_port], @port_binding.update
-                assert @port_binding.valid?
-            end
+                    expected = Syskit::DynamicPortBinding::CompositePort
+                               .new([@task.out_port])
+                    assert_equal [true, expected], @port_binding.update
+                    assert @port_binding.valid?
+                end
 
-            it "returns [true, nil] if the current match is not valid anymore" do
-                syskit_configure_and_start(@task)
-                @port_binding.update
-                syskit_stop task
+                it "returns [false, port] if the current match is still valid" do
+                    syskit_configure_and_start(@task)
+                    expected = Syskit::DynamicPortBinding::CompositePort
+                               .new([@task.out_port])
+                    @port_binding.update
+                    assert_equal [false, expected], @port_binding.update
+                    assert @port_binding.valid?
+                end
 
-                assert_equal [true, nil], @port_binding.update
-                refute @port_binding.valid?
+                it "returns [true, nil] if the current match is not valid anymore" do
+                    syskit_configure_and_start(@task)
+                    @port_binding.update
+                    syskit_stop task
+
+                    assert_equal [true, nil], @port_binding.update
+                    refute @port_binding.valid?
+                end
             end
         end
 
@@ -574,7 +622,8 @@ module Syskit
             end
 
             it "processes the samples through the given value resolver" do
-                @value_resolver.should_receive(:__resolve).with(2).and_return(42)
+                @value_resolver.should_receive(:__resolve).with(2, any, { all: false })
+                               .and_return(42)
                 @reader.attach_to_task(@task)
                 wait_until_connected @reader
                 execute { syskit_write @task.out_port, 2 }
@@ -639,7 +688,8 @@ module Syskit
             end
 
             it "processes the samples through the given value resolver" do
-                @value_resolver.should_receive(:__resolve).with(2.0).and_return(42)
+                @value_resolver.should_receive(:__resolve).with(2.0, any, { all: false })
+                               .and_return(42)
                 @reader.attach_to_task(@task)
                 wait_until_connected @reader
                 execute { syskit_write @task.out_port, 2 }
